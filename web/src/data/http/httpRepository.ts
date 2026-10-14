@@ -9,26 +9,7 @@ import type {
   WorkWindow,
 } from '../types';
 
-const BASE = '/api';
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  });
-  if (!res.ok) {
-    let message = `HTTP ${res.status}`;
-    try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      if (body.error?.message) message = body.error.message;
-    } catch {
-      // ignore
-    }
-    throw new Error(message);
-  }
-  if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
-}
+import { request, requestJson } from './httpClient';
 
 function filtersQuery(filters?: TaskFilters): string {
   if (!filters) return '';
@@ -58,10 +39,10 @@ export function createHttpRepository(): Repository {
       return request<Task>(`/tasks/${id}`);
     },
     async createTask(input) {
-      return request<Task>(`/tasks`, { method: 'POST', body: JSON.stringify(input) });
+      return requestJson<Task>(`/tasks`, 'POST', input);
     },
     async updateTask(id, patch) {
-      return request<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+      return requestJson<Task>(`/tasks/${id}`, 'PATCH', patch);
     },
     async deleteTask(id) {
       await request<void>(`/tasks/${id}`, { method: 'DELETE' });
@@ -71,7 +52,7 @@ export function createHttpRepository(): Repository {
       return request<Settings>(`/settings`);
     },
     async updateSettings(patch) {
-      return request<Settings>(`/settings`, { method: 'PUT', body: JSON.stringify(patch) });
+      return requestJson<Settings>(`/settings`, 'PUT', patch);
     },
 
     async listWorkWindows() {
@@ -79,7 +60,7 @@ export function createHttpRepository(): Repository {
       return res ?? [];
     },
     async setWorkWindows(windows) {
-      return request<WorkWindow[]>(`/schedule/windows`, { method: 'PUT', body: JSON.stringify(windows) });
+      return requestJson<WorkWindow[]>(`/schedule/windows`, 'PUT', windows);
     },
 
     async listDayCapacities(from, to) {
@@ -87,7 +68,7 @@ export function createHttpRepository(): Repository {
       return res ?? [];
     },
     async upsertDayCapacity(capacity) {
-      await request<void>(`/schedule/capacity`, { method: 'PUT', body: JSON.stringify(capacity) });
+      await requestJson<void>(`/schedule/capacity`, 'PUT', capacity);
     },
 
     async listSlices(from, to) {
@@ -95,10 +76,7 @@ export function createHttpRepository(): Repository {
       return res.slices ?? [];
     },
     async replaceTaskSlices(taskId, slices) {
-      return request<TaskSlice[]>(`/planner/apply`, {
-        method: 'POST',
-        body: JSON.stringify({ taskId, slices }),
-      });
+      return requestJson<TaskSlice[]>(`/planner/apply`, 'POST', { taskId, slices });
     },
     async addDoneHoursToSlice(taskId, date, hours) {
       // списание происходит внутри completeWorkSession на бэкенде
@@ -110,13 +88,10 @@ export function createHttpRepository(): Repository {
       return res ?? [];
     },
     async createPomodoroSession(session) {
-      return request<PomodoroSession>(`/pomodoro/start`, { method: 'POST', body: JSON.stringify(session) });
+      return requestJson<PomodoroSession>(`/pomodoro/start`, 'POST', session);
     },
     async finishPomodoroSession(id, actualMin) {
-      return request<PomodoroSession>(`/pomodoro/${id}/finish`, {
-        method: 'POST',
-        body: JSON.stringify({ actualMin }),
-      });
+      return requestJson<PomodoroSession>(`/pomodoro/${id}/finish`, 'POST', { actualMin });
     },
     async completeWorkSession(id, actualMin) {
       // бэкенд при finish сам списывает часы в задачу и срез
